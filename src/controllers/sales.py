@@ -2,6 +2,7 @@ from fastapi import APIRouter, status, HTTPException
 from models.Product import Product
 from models.Orders import Orders
 from models.orders_products import OrdersProducts
+from DTOs.sales_filter import SalesFilter
 from DTOs.SalesInvoiceDTO import SalesInvoiceDTO
 from datetime import datetime
 from peewee import JOIN
@@ -9,10 +10,21 @@ from peewee import JOIN
 router = APIRouter()
 
 @router.get('/')
-async def get_sales_invoices():
+async def get_sales_invoices(filter: SalesFilter):
+    query = Orders.select().join(OrdersProducts, JOIN.LEFT_OUTER).where(Orders.doctype=='SI')
+
+    if filter.frmDate != None:
+        query = query.where(Orders.created_at.between(filter.frmDate, filter.toDate))
+    
+    if filter.product_id:
+        query = query.where(OrdersProducts.product_id==filter.product_id)
+    
+    if filter.products:
+        query = query.where(OrdersProducts.product_id.in_(filter.products))
+
     return {
         "success": True,
-        "orders": [p.__data__ for p in Orders.select().join(OrdersProducts, JOIN.LEFT_OUTER).where(Orders.doctype=='SI')]
+        "orders": [p.__data__ for p in query]
     }
 
 @router.post('/')
