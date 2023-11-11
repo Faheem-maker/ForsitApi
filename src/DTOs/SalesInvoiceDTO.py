@@ -1,6 +1,4 @@
-from typing_extensions import Unpack
-from pydantic import BaseModel, validator
-from pydantic.config import ConfigDict
+from pydantic import BaseModel
 from models.Product import Product as Model
 from typing import List
 

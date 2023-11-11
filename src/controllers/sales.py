@@ -1,30 +1,51 @@
 from fastapi import APIRouter, status, HTTPException
-from models.Product import Product
 from models.Orders import Orders
 from models.orders_products import OrdersProducts
-from DTOs.sales_filter import SalesFilter
 from DTOs.SalesInvoiceDTO import SalesInvoiceDTO
-from datetime import datetime
+from datetime import datetime, date, timedelta
 from peewee import JOIN
 
 router = APIRouter()
 
 @router.get('/')
-async def get_sales_invoices(filter: SalesFilter):
-    query = Orders.select().join(OrdersProducts, JOIN.LEFT_OUTER).where(Orders.doctype=='SI')
+async def get_sales_invoices(frmDate: date = None, toDate: date = date.today(), product_id: str = '', period: str = None):
+    products = product_id.split(',')
 
-    if filter.frmDate != None:
-        query = query.where(Orders.created_at.between(filter.frmDate, filter.toDate))
+    query = OrdersProducts.select(
+        OrdersProducts.product_id,
+        OrdersProducts.product_qty,
+        OrdersProducts.total_amount,
+        Orders.created_at
+    ).join(Orders, JOIN.LEFT_OUTER).where(Orders.doctype=='SI')
+
+    if period != None:
+        toDate = datetime.today()
+        if period == 'today':
+            frmDate = datetime.today()
+        elif period == 'week':
+            day = datetime.today()
+            frmDate = day - timedelta(days=day.weekday())
+        elif period == 'month':
+            frmDate = datetime.today().replace(day=1)
+        elif period == 'year':
+            frmDate = datetime.today().replace(month=1, day=1)
+        else:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Please specify a valid time period')
+
+    if frmDate != None:
+        query = query.where(Orders.created_at.between(frmDate, toDate))
     
-    if filter.product_id:
-        query = query.where(OrdersProducts.product_id==filter.product_id)
-    
-    if filter.products:
-        query = query.where(OrdersProducts.product_id.in_(filter.products))
+    if len(products) > 0 and products[0] != '':
+        query = query.where(OrdersProducts.product_id.in_(products))
 
     return {
         "success": True,
-        "orders": [p.__data__ for p in query]
+        "orders": [{
+            "product": p.__data__['product_id'],
+            "qty": p.__data__['product_qty'],
+            "total": p.__data__['total_amount'],
+            "created": p.__rel__['order_id'].__data__['created_at']
+        } for p in query]
     }
 
 @router.post('/')

@@ -1,5 +1,5 @@
-from peewee import PrimaryKeyField, CharField, IntegerField, DateTimeField, ForeignKeyField
-from .BaseModel import BaseModel
+from peewee import PrimaryKeyField, IntegerField, DateTimeField, ForeignKeyField
+from .BaseModel import BaseModel, db
 from .Orders import Orders
 from .Product import Product
 
@@ -16,3 +16,4 @@ class OrdersProducts(BaseModel):
 
     class Meta:
         table_name = 'orders_products'
+        database = db
