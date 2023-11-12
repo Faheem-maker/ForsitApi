@@ -4,7 +4,7 @@ from models.orders_products import OrdersProducts
 from models.Product import Product
 from DTOs.SalesInvoiceDTO import SalesInvoiceDTO
 from datetime import datetime, date, timedelta
-from peewee import JOIN
+from peewee import JOIN, fn
 from DTOs.sales_filter import SalesFilter
 
 router = APIRouter()
@@ -86,6 +86,10 @@ async def create_sales_invoice(invoice: SalesInvoiceDTO):
         "discount_amount": p.discount,
         "tax_amount": p.tax,
     } for p in invoice.products]).execute()
+
+    # Update product stock
+    for product in invoice.products:
+        Product.update(qty=Product.qty-product.qty).where(Product.id==product.id).execute()
 
     return {
         "success": True,
