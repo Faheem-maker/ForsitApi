@@ -1,33 +1,40 @@
 from fastapi import APIRouter, status, HTTPException
 from models.Orders import Orders
 from models.orders_products import OrdersProducts
+from models.Product import Product
 from DTOs.SalesInvoiceDTO import SalesInvoiceDTO
 from datetime import datetime, date, timedelta
 from peewee import JOIN
+from DTOs.sales_filter import SalesFilter
 
 router = APIRouter()
 
 @router.get('/')
-async def get_sales_invoices(frmDate: date = None, toDate: date = date.today(), product_id: str = '', period: str = None):
-    products = product_id.split(',')
+async def get_sales_invoices(filter: SalesFilter):
+    products = filter.product_id.split(',')
+
+    categories = filter.category_id.split(',')
 
     query = OrdersProducts.select(
         OrdersProducts.product_id,
         OrdersProducts.product_qty,
         OrdersProducts.total_amount,
         Orders.created_at
-    ).join(Orders, JOIN.LEFT_OUTER).where(Orders.doctype=='SI')
+    ).join(Orders, JOIN.LEFT_OUTER).join(Product, JOIN.LEFT_OUTER, on=(Product.id == OrdersProducts.product_id)).where(Orders.doctype=='SI')
 
-    if period != None:
+    frmDate = filter.frmDate
+    toDate = filter.toDate
+
+    if filter.period != None:
         toDate = datetime.today()
-        if period == 'today':
+        if filter.period == 'today':
             frmDate = datetime.today()
-        elif period == 'week':
+        elif filter.period == 'week':
             day = datetime.today()
             frmDate = day - timedelta(days=day.weekday())
-        elif period == 'month':
+        elif filter.period == 'month':
             frmDate = datetime.today().replace(day=1)
-        elif period == 'year':
+        elif filter.period == 'year':
             frmDate = datetime.today().replace(month=1, day=1)
         else:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Please specify a valid time period')
@@ -37,6 +44,9 @@ async def get_sales_invoices(frmDate: date = None, toDate: date = date.today(), 
     
     if len(products) > 0 and products[0] != '':
         query = query.where(OrdersProducts.product_id.in_(products))
+
+    if len(categories) > 0 and categories[0] != '':
+        query = query.where(Product.category_id.in_(categories))
 
     return {
         "success": True,
