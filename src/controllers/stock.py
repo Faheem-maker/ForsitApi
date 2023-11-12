@@ -2,8 +2,9 @@ from fastapi import APIRouter
 from models.Product import Product
 from models.orders_products import OrdersProducts
 from models.Orders import Orders
+from DTOs.update_stock import UpdateStatus
 from peewee import fn, Case
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 
 router = APIRouter()
 
@@ -19,6 +20,23 @@ async def get_low_stock(minimum_qty: int = -1):
     return {
         'success': True,
         'products': [p.__data__ for p in Product.select(Product.id, Product.name, Product.qty).where(Product.qty<(Product.minimum_qty if minimum_qty < 0 else minimum_qty))]
+    }
+
+@router.post('/')
+async def update_level(status: UpdateStatus):
+    product = Product.get_by_id(status.product_id)
+    diff = product.qty - status.qty
+
+    # Create a purchase invoice to update rates (Will later use DC or PO instead)
+    o = Orders.create(base_amount=0, discount_amount=0, tax_amount=0, created_at=datetime.utcnow(), doctype='PI')
+
+    OrdersProducts.create(order_id=o.id,product_id=product.id, product_rate=0, product_qty=diff, discount_amount=0, tax_amount=0)
+
+    product.qty = status.qty
+    product.save()
+
+    return {
+        'success': True,
     }
 
 @router.get('/report')
